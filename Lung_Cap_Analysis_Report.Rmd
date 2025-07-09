@@ -1,6 +1,10 @@
 ---
-title: "Modeling Lung Capacity in Pediatric Population: A Regression-Based Approach to Assessing Respiratory Development"
-output: html_document
+title: "Modeling Lung Capacity in Pediatric Population: A Regression-Based Approach
+  to Assessing Respiratory Development"
+author: "Sana Siddiqui, MD"
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, echo=FALSE}
@@ -302,7 +306,7 @@ By using standardized coefficients (e.g., via lm_beta()), we can determine which
 ### Results of Linear Regression
 
   - All predictors are significant at the 5% significance level
-  - Height and Age are the strongest predictors of lung capacity, with standardized coefficients (β) of approximately 0.74 and 0.21, respectively.
+  - Height and Age are the strongest predictors of lung capacity, with standardized coefficients of approximately 0.74 and 0.21, respectively.
   - This means that for every 1 standard deviation increase in height or age, the lung capacity increases by 0.74 SDs and 0.21 SDs respectively. 
   - The adjusted R-squared is 0.85 with a significant p-value < 0.001 indicating that 85% of the variation in lung capacity can be explained by the predictors used in this model i.e. age, height, smoking status, gender, and caeserean status. 
 
