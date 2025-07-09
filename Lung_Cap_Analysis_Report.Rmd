@@ -1,0 +1,371 @@
+---
+title: "Modeling Lung Capacity in Pediatric Population: A Regression-Based Approach to Assessing Respiratory Development"
+output: html_document
+---
+
+```{r setup, echo=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(warn = -1)
+```
+
+# Introduction
+
+Pediatric lung capacity is a vital clinical marker used to assess respiratory health and growth in children, especially those at risk for chronic pulmonary diseases such as asthma. While spirometry is the gold standard for measuring lung function, it is often impractical for very young children who cannot reliably perform the test. As a result, there is a clinical need for alternative methods to estimate lung capacity using routinely collected health data.
+
+In this case study, we developed a linear regression model to predict pediatric lung capacity based on common clinical indicators: age, height, gender, smoking status, and birth method. Our goal was to create a practical tool to help clinicians proactively identify children at risk for respiratory conditions when spirometry is not feasible.
+
+
+
+# Data Cleaning
+
+The data was cleaned in a separate R script: Scripts/Data_Cleaning.R
+
+Cleaning steps included:
+
+- Standardizing column names
+
+- Assessing for missing data
+
+- Removing duplicate rows 
+    
+    
+# Data Overview/Library
+
+The data includes the following variables:
+
+  - lung capacity: measured in liters
+  
+  - age: years
+  
+  - height: inches
+  
+  - gender
+  
+  - smoking status: yes or no depending on if the child smokes
+  
+  - caesarean: yes or no depending on birth method of the child
+  
+
+__Data Overview__
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Load libraries
+library(tidyverse)
+library(knitr)
+library(skimr)
+
+# Load cleaned dataset
+df = read_csv("Data/Cleaned/Cleaned_Lung_Cap_Data.csv")
+
+# View initial rows 
+kable(head(df))
+```
+
+# Exploratory Data Analysis
+
+Summary Statistics
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+glimpse(df)
+summary(df)
+```
+
+### Distributions of Continuous Variables 
+
+
+The histogram below displays the distribution of lung capacity values in the dataset. The distribution appears approximately normal, with most values clustered around the mean, indicating a central tendency typical of a Gaussian distribution
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(df, aes(x = lung_cap)) + geom_histogram(bins = 30, fill = "steelblue") + theme_minimal() + labs(title = "Frequency Distribution of Lung Capacity", x = "Lung Capacity", y = "Count of Values") + 
+  theme(plot.title = element_text(hjust = 0.5), 
+        axis.title.y = element_text(margin = margin(r = 15)), 
+        axis.title.x = element_text(margin = margin(t = 15)),
+        panel.border = element_rect(colour='black', fill = NA, size=1.0))
+```
+
+
+Similarly, the distribution of age values appears to be approximately normal with most values clustered around the mean. 
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(df, aes(x = age)) + geom_histogram(binwidth = 1, fill = "steelblue") + theme_minimal() + labs(title = "Frequency Distribution of Age", x = "Age", y = "Count of Values") + theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15)), panel.border = element_rect(colour='black', fill = NA, size=1.0))
+```
+
+
+Finally, the histogram above reflects the distribution of height values and also appears to be approximately normal. 
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+ggplot(df, aes(x = height)) + geom_histogram(binwidth = 2, fill = "steelblue") + theme_minimal() + labs(title = "Frequency Distribution of Height", x = "Height", y = "Count of Values") + theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15)), panel.border = element_rect(colour='black', fill = NA, size=1.0))
+```
+
+### Distributions of Categorical Variables
+
+__Smoking Status__
+
+The bar graph below shows that majority patients (over 95%) in this dataset were nonsmokers. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+df %>%
+  count(smoke) %>%
+  ggplot(aes(x = smoke, y = n)) + geom_col(fill = "khaki") + theme_minimal() +
+  labs(title = "Count of Smokers vs. Non-Smokers", x = "Smoking Status", y = "Count of Values") + theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15)), panel.border = element_rect(colour='black', fill = NA, size=1.0))
+```
+
+__Gender__
+
+The bar graph below shows that we have an almost equal split between male and female patients in the dataset out of a total of 725 patients. 
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+df %>%
+  count(gender) %>%
+  ggplot(aes(x = gender, y = n)) + geom_col(fill = "khaki") + theme_minimal() + labs(title = "Count of Males vs. Females", x = "Gender", y = "Count of Values") + theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15)), panel.border = element_rect(colour='black', fill = NA, size=1.0))
+```
+
+__Caesarean Status__
+
+The bar graph below shows that majority of the patients in this dataset were delivered vaginally (> 80% of patients) while a small subset were delivered via C-section. 
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+df %>%
+  count(caesarean) %>%
+  ggplot(aes(x = caesarean, y = n)) + geom_col(fill = "khaki") + theme_minimal() + labs(title = "Count of C-sections vs. Vaginal Deliveries", x = "C-section?", y = "Count of Values") + theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15)),panel.border = element_rect(colour='black', fill = NA, size=1.0))
+```
+
+### Relationship between Lung Capacity and other variables
+
+__Lung Capacity and Age__
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+df %>%
+  ggplot(aes(x=age, y=lung_cap)) + geom_point() + geom_smooth(method="lm") +
+  labs(title = 'Lung Capacity vs. Age Correlation', x = "Age", y = "Lung Capacity") + theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15)),panel.border = element_rect(colour='black', fill = NA, size=1.0))
+```
+
+There is a positive correlation between lung capacity and age. Lung capacity tends to increase with age. 
+
+
+
+__Lung Capacity and Height__
+
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+
+df %>%
+  ggplot(aes(x=height, y=lung_cap)) + geom_point() + geom_smooth(method="lm") +   labs(title = 'Lung Capacity vs. Height Correlation', x = "Height", y = "Lung Capacity") + theme(plot.title = element_text(hjust = 0.5), axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15)),panel.border = element_rect(colour='black', fill = NA, size=1.0))
+```
+
+There is a positive correlation between lung capacity and age. Lung capacity tends to increase with age. 
+
+__Lung Capacity By Smoking Status__
+
+The boxplot below illustrates the distribution of lung capacity values among smokers and non-smokers. Given that the dataset contains a larger proportion of non-smokers, the wider spread in lung capacity values for this group is expected due to the greater sample size
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+
+df %>%
+  ggplot(aes(x=smoke, y=lung_cap)) + geom_boxplot(fill ="coral") + theme_minimal() +
+  labs(title = 'Boxplot of Lung Capacity vs. Smoking Status', x = "Smoking Status", y = "Lung Capacity") + theme(panel.border = element_rect(color = "black", fill = NA, size = 1), plot.title = element_text(hjust = 0.5, margin = margin(b = 20, t =10)), axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15, b = 40)))
+```
+
+The following table is used to understand the smoking vs. non smoking groups better. 
+  
+  - The group of non smokers has a similar number of male and females
+  - The smoking group also has a similar number of males and females
+
+```{r echo=FALSE,message=FALSE, warning=FALSE}
+smoker_gender_data = df %>%
+  group_by(smoke, gender) %>%
+  summarise(min_age = min(age, na.rm = TRUE),
+            max_age = max(age, na.rm = TRUE),
+            avg_age = round(mean(age, na.rm = TRUE),0),
+            n = n())
+kable(smoker_gender_data)
+```
+
+The next table explores the smoking group even further to understand the differences in lung capacities between the two groups. The boxplot above showing the distribution of values between smokers and nonsmokers shows a slightly greater median in the smoking group. This is counter-intuitive; we would expect a lower lung capacity in the smoking group. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+smoker_lung_cap_data = df %>%
+  group_by(smoke) %>%
+  summarise(min_lung_cap = min(lung_cap, na.rm = TRUE),
+            max_lung_cap = max(lung_cap, na.rm = TRUE),
+            avg_lung_cap = round(mean(lung_cap, na.rm = TRUE),0),
+            n = n())
+kable(smoker_lung_cap_data)
+```
+
+We observe that the number of smokers in the dataset is significantly smaller than the number of non-smokers. Additionally, the average age of smokers is higher than that of non-smokers. Since lung capacity generally increases with age, we would expect older children—regardless of smoking status—to exhibit higher lung capacity.
+
+It’s important to note that teenagers are more likely to engage in smoking than younger children. However, the negative effects of smoking on lung capacity typically develop over time and may not be immediately apparent in the early years of smoking. Therefore, the boxplot results align with expectations: as children grow older, they are both physically developing and increasingly exposed to risk behaviors such as smoking. Yet, the short-term impact of smoking may be masked by ongoing growth, making the harmful effects less visible at this stage.
+
+
+__Lung Capacity By Gender__
+
+The boxplot below illustrates the distribution of lung capacity among males and females. While the overall variability in lung capacity appears comparable between the two groups, the female group shows a slight left skew. This suggests that lung capacity values are more tightly clustered between the first and third quartiles, with a few lower values pulling the median closer to the upper quartile
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+df %>%
+  ggplot(aes(x=gender, y=lung_cap)) + geom_boxplot(fill ="coral") + theme_minimal() +
+  labs(title = 'Boxplot of Lung Capacity vs. Gender', x = "Gender", y = "Lung Capacity") + theme(panel.border = element_rect(color = "black", fill = NA, size = 1), plot.title = element_text(hjust = 0.5, margin = margin(b = 20, t =10)), axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15, b = 40)))
+
+```
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+gender_data = df %>%
+  group_by(gender) %>%
+  summarise(min_age = min(age, na.rm = TRUE),
+            max_age = max(age, na.rm = TRUE),
+            avg_age = round(mean(age, na.rm = TRUE),0),
+            n = n())
+kable(gender_data)
+```
+
+__Lung Capacity By Delivery Type__
+
+The boxplot below displays distribution of lung capacity in children born born via C-section and via vaginal delivery. While majority children in this dataset were born vaginally, there is comparable variability in lung capacity amongst both groups of children. The medians are almost identical. 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+df %>%
+  ggplot(aes(x=caesarean, y=lung_cap)) + geom_boxplot(fill ="coral") + theme_minimal() + labs(title = 'Boxplot of Lung Capacity vs. Delivery Type', x = "C-section?", y = "Lung Capacity") + theme(panel.border = element_rect(color = "black", fill = NA, size = 1), plot.title = element_text(hjust = 0.5, margin = margin(b = 20, t =10)), axis.title.y = element_text(margin = margin(r = 15)), axis.title.x = element_text(margin = margin(t = 15, b = 40)))
+```
+
+To predict lung capacity in the pediatric population, a linear regression model was selected as the most appropriate modeling approach based on the characteristics of the dataset.
+
+The model satisfies key assumptions of linear regression:
+
+  - Linearity: Lung capacity shows a linear relationship with both age and height.
+
+  - No multicollinearity: All predictor variables have Variance Inflation Factors (VIF) well below the threshold of 5, indicating minimal correlation between them.
+
+  - Homoskedasticity: Residuals exhibit constant variance across the range of fitted values.
+
+
+# Linear Regression
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(car)
+library(broom)
+library(ggpubr)
+library(lm.beta)
+```
+
+__Multicollinearity / VIF__
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Check VIF for all predictors
+model_prelim = lm(lung_cap ~ age + height + smoke + gender + caesarean, data=df )
+car::vif(model_prelim)
+```
+
+__All VIFs are < 5, meaning no significant multicollinearity amongst predictors.__
+
+
+__Linear Regression__
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Fit model
+model = lm(lung_cap ~ age + height + smoke + gender + caesarean, data=df )
+summary(model)
+```
+
+__Results Interpretation__
+
+  - All predictors have p-values < 0.05 and are significant at the 5% level of significance, we can safely assume all predictors have 
+  - Adjusted R-squared value is posiitve and very close to 1.
+  - Overall p-value of the model is highly significant at the 5% significance level
+
+
+__Standardizing Model Fit__
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+# Assessing model fit
+model_std = lm.beta::lm.beta(model)
+summary(model_std)
+```
+
+
+What is standardization and why did we standardize the model's coefficients?
+
+Standardization refers to the process of transforming variables to a common scale — typically by converting them to z-scores (i.e., mean = 0, standard deviation = 1).
+
+In the context of linear regression, this allows us to normalize the scale of the predictors (independent variables), so that the resulting coefficients are directly comparable.
+
+This is useful because even though multiple predictors may be statistically significant, we cannot directly compare the magnitude of their unstandardized coefficients — since they may be measured in different units (e.g., age in years vs. height in cm).
+
+By using standardized coefficients (e.g., via lm_beta()), we can determine which predictors have a greater relative effect on the outcome variable, because they are all now on the same unitless scale. 
+
+
+### Results of Linear Regression
+
+  - All predictors are significant at the 5% significance level
+  - Height and Age are the strongest predictors of lung capacity, with standardized coefficients (β) of approximately 0.74 and 0.21, respectively.
+  - This means that for every 1 standard deviation increase in height or age, the lung capacity increases by 0.74 SDs and 0.21 SDs respectively. 
+  - The adjusted R-squared is 0.85 with a significant p-value < 0.001 indicating that 85% of the variation in lung capacity can be explained by the predictors used in this model i.e. age, height, smoking status, gender, and caeserean status. 
+
+# Predictive Modeling 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(caret)
+
+set.seed(123)
+train_index = createDataPartition(df$lung_cap, p = 0.8, list = FALSE)
+train_data = df[train_index, ]
+test_data = df[-train_index, ]
+
+model = lm(lung_cap ~ age + height + smoke + gender + caesarean, data = train_data)
+summary(model)
+
+# make predictions using test data
+predictions = predict(model, test_data)
+
+# evaluating model
+results = data.frame(actual = test_data$lung_cap, predicted = predictions)
+
+# RMSE
+rmse = sqrt(mean((results$actual - results$predicted)^2))
+rmse
+
+summary(df$lung_cap)
+sd(df$lung_cap)
+
+```
+### Prediction Analysis
+  - All predictors in the model are statistically significant with p-values < 0.05
+  - The adjusted R-squared is 0.86 and is statistically significant; all predictors captured in this model explain 86% of the variability seen in lung capacity
+  - The root mean squared error is 1.14, meaning on average, the model's lung capacity prediction is off by 1.14 liters. In order to evaluate this, we compare RMSE to the standard deviation (SD) of lung capacity of our entire dataset. As seen above in the summary statistics, the SD of lung capacity is 2.66. 
+
+__Overall, this indicates that the model provides considerably more accurate predictions than a naive model based on the mean, and it explains a meaningful amount of the variance in lung capacity.__
+
+
+
+```{r echo =FALSE, message=FALSE, warning=FALSE}
+ggplot(results, aes(x=actual, y=predicted)) + 
+  geom_point(color = 'blue', alpha = 0.5) + 
+  geom_abline(slope = 1, intercept = 0, linetype = 'dashed', color = 'black') +
+  labs(title = "Actual vs Predicted Lung Capacity", x = "Actual Lung Capacity (liters)", y = "Predicted Lung Capacity (liters)") +
+  theme_minimal() + theme(plot.title = element_text(hjust = 0.5),
+                          axis.title.x = element_text(margin = margin(t=15)),
+                          axis.title.y = element_text(margin = margin(r=20)),
+                          panel.border = element_rect(colour = 'black', fill = NA, size = 1.0))
+```
+
+The scatterplot above indicates a well-performing predictive model. There is a strong positive relationship between actual and predicted lung capacity values, with most points closely aligning along the best-fit trend line and minimal deviation.
+
+# Conclusion
+
+Pediatric lung capacity is a powerful tool that helps clinicians assess overall pulmonary function as the child grows, especially in children with chronic pulmonary diseases. It can be used as a preventative tool in populations of children that are at highest risk for chronic conditions, most commonly asthma. While the gold standard technique of accurately capturing lung capcity is pulmonary function testing via spirometry, very young children are unable to complete this test purely based on their age. Therefore, if we are able to use other characteristics about the child's health to predict lung capacity and assess it against the average capacity of children within the respective age group, we can proactively identify children who are at risk of developing pulmonary conditions. 
+
+In this case study, we aimed to utilize the most commonly tracked elements from clinical pediatric visits including age, height, gender, smoking status of the child, and birth method to predict lung capacity. 
+
+We used linear regression to predict lung capacity based on the predictors desacribed above. Our model and predictors were all statistically significant with an adjusted R-squared of 0.85; 85% of the variability in the lung capacity within our dataset can be explained by the predictors utilized in the model to make predictions. In order to assess the accuracy of the model, we calculated the root mean squared error (RMSE) to compare our model to a brute force approach of using the mean and standard deviation of lung capacity within the original datsaet to calculate lung capacity of any given child. The RMSE was 1.14 liters and standard deviation of lung capacity in the original datset was 2.66 liters. We can strongly conclude that our model, despite being off by 1.14 liters on average from actual lung capacity predicts lung capacity better than utilizing a naive approach of using the standard deviation alone. 
+
+
+
+
+
+
+
